@@ -16,7 +16,7 @@ interface InputFormProps {
 }
 
 const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setError }) => {
-  const [inputType, setInputType] = useState<'url' | 'text' | 'import'>('url');
+  const [isUrlInput, setIsUrlInput] = useState(true);
   const [input, setInput] = useState('');
   const [useMockMode, setUseMockMode] = useState(true);
   const jsonInputRef = useRef<HTMLInputElement>(null);
@@ -40,8 +40,6 @@ const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setE
       return false;
     }
   };
-
-  const isUrlInput = inputType === 'url';
 
   const extractTitleFromUrl = (url: string): string => {
     try {
@@ -86,7 +84,7 @@ const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setE
       let content = input;
       let source = 'Custom text';
 
-      if (inputType === 'url') {
+      if (isUrlInput) {
         if (!isValidWikipediaUrl(input)) {
           setError('Please enter a valid Wikipedia URL');
           setLoading(false);
@@ -101,7 +99,7 @@ const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setE
       const flashcards = await extractFlashcards(content, undefined, useMockMode);
 
       setFlashcardSet({
-        title: inputType === 'url' ? extractTitleFromUrl(input) : 'Custom Text Flashcards',
+        title: isUrlInput ? extractTitleFromUrl(input) : 'Custom Text Flashcards',
         source,
         cards: flashcards,
         createdAt: new Date(),
@@ -123,86 +121,78 @@ const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setE
         <div className="input-type-selector">
           <button
             type="button"
-            className={inputType === 'text' ? 'active' : ''}
-            onClick={(): void => setInputType('text')}
-          >
-            Custom Text
-          </button>
-          <button
-            type="button"
-            className={inputType === 'url' ? 'active' : ''}
-            onClick={(): void => setInputType('url')}
+            className={isUrlInput === true ? 'active' : ''}
+            onClick={(): void => setIsUrlInput(true)}
           >
             Wikipedia URL
           </button>
           <button
             type="button"
-            className={inputType === 'import' ? 'active' : ''}
-            onClick={(): void => setInputType('import')}
+            className={isUrlInput === false ? 'active' : ''}
+            onClick={(): void => setIsUrlInput(false)}
           >
-            Import
+            Custom Text
           </button>
         </div>
 
-        {inputType === 'import' ? (
-          <div className="import-section">
-            <div className="import-buttons">
-              <button
-                type="button"
-                className="import-button import-button-json"
-                onClick={(): void => jsonInputRef.current?.click()}
-              >
-                Import JSON
-              </button>
-              <button
-                type="button"
-                className="import-button import-button-csv"
-                onClick={(): void => csvInputRef.current?.click()}
-              >
-                Import CSV
-              </button>
-              <input
-                ref={jsonInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleJsonImportWrapper}
-                style={{ display: 'none' }}
-                data-testid="json-input"
-              />
-              <input
-                ref={csvInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleCsvImportWrapper}
-                style={{ display: 'none' }}
-                data-testid="csv-input"
-              />
-            </div>
+        <div className="form-group">
+          <label htmlFor="input">
+            {isUrlInput ? 'Wikipedia URL' : 'Text to extract flashcards from'}
+          </label>
+          <textarea
+            id="input"
+            value={input}
+            onChange={(e): void => setInput(e.target.value)}
+            placeholder={
+              isUrlInput
+                ? 'https://en.wikipedia.org/wiki/Artificial_intelligence'
+                : 'Paste your text here...'
+            }
+            rows={isUrlInput ? 1 : 10}
+          />
+        </div>
+
+        <MockModeToggle onChange={setUseMockMode} />
+
+        <button className="submit-button" type="submit">Generate Flashcards</button>
+
+        <div className="import-section">
+          <div className="or-divider">
+            <span>OR</span>
           </div>
-        ) : (
-          <>
-            <div className="form-group">
-              <label htmlFor="input">
-                {isUrlInput ? 'Wikipedia URL' : 'Text to extract flashcards from'}
-              </label>
-              <textarea
-                id="input"
-                value={input}
-                onChange={(e): void => setInput(e.target.value)}
-                placeholder={
-                  isUrlInput
-                    ? 'https://en.wikipedia.org/wiki/Artificial_intelligence'
-                    : 'Paste your text here...'
-                }
-                rows={isUrlInput ? 1 : 10}
-              />
-            </div>
-
-            <MockModeToggle onChange={setUseMockMode} />
-
-            <button className="submit-button" type="submit">Generate Flashcards</button>
-          </>
-        )}
+          <div className="import-buttons">
+            <button
+              type="button"
+              className="import-button import-button-json"
+              onClick={(): void => jsonInputRef.current?.click()}
+            >
+              Import JSON
+            </button>
+            <button
+              type="button"
+              className="import-button import-button-csv"
+              onClick={(): void => csvInputRef.current?.click()}
+            >
+              Import CSV
+            </button>
+            <input
+              ref={jsonInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleJsonImportWrapper}
+              style={{ display: 'none' }}
+              data-testid="json-input"
+            />
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleCsvImportWrapper}
+              style={{ display: 'none' }}
+              data-testid="csv-input"
+            />
+          </div>
+        </div>
       </form>
     </div>
   );

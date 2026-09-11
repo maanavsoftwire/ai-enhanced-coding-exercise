@@ -84,7 +84,27 @@
 }
 
 .import-section {
-  margin-top: 1.5rem;
+  margin-top: 2rem;
+}
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.or-divider span {
+  padding: 0 1rem;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .import-buttons {
