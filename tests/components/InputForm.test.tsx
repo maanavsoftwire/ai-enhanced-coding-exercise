@@ -8,6 +8,10 @@ import { getLLMConfig } from '../../src/config';
 import { extractFlashcards } from '../../src/services/llmService';
 import { fetchWikipediaContent } from '../../src/services/wikipediaService';
 
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'mock-uuid-123'),
+}));
+
 jest.mock('../../src/services/llmService', () => ({
   extractFlashcards: jest.fn(),
 }));
@@ -350,6 +354,124 @@ describe('InputForm Component', () => {
     await waitFor(() => {
       // Verify that mock mode (true) was passed to extractFlashcards
       expect(mockExtractFlashcards).toHaveBeenCalledWith(mockWikiContent.content, undefined, true);
+    });
+  });
+
+  test('renders import buttons', () => {
+    render(
+      <InputForm
+        setFlashcardSet={mockSetFlashcardSet}
+        setLoading={mockSetLoading}
+        setError={mockSetError}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Import JSON' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import CSV' })).toBeInTheDocument();
+  });
+
+  test('handles JSON file import', async () => {
+    const mockJsonContent = {
+      title: 'Test Flashcards',
+      source: 'Test Source',
+      cards: [
+        { question: 'Question 1', answer: 'Answer 1' },
+        { question: 'Question 2', answer: 'Answer 2' },
+      ],
+      createdAt: new Date().toISOString(),
+    };
+
+    const file = new File([JSON.stringify(mockJsonContent)], 'test.json', { type: 'application/json' });
+
+    render(
+      <InputForm
+        setFlashcardSet={mockSetFlashcardSet}
+        setLoading={mockSetLoading}
+        setError={mockSetError}
+      />,
+    );
+
+    const jsonInput = screen.getByTestId('json-input') as HTMLInputElement;
+    fireEvent.change(jsonInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockSetFlashcardSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Test Flashcards',
+          source: 'Test Source',
+          cards: expect.arrayContaining([
+            expect.objectContaining({ question: 'Question 1', answer: 'Answer 1' }),
+            expect.objectContaining({ question: 'Question 2', answer: 'Answer 2' }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  test('handles CSV file import', async () => {
+    const csvContent = 'Question,Answer\n"Question 1","Answer 1"\n"Question 2","Answer 2"';
+    const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
+
+    render(
+      <InputForm
+        setFlashcardSet={mockSetFlashcardSet}
+        setLoading={mockSetLoading}
+        setError={mockSetError}
+      />,
+    );
+
+    const csvInput = screen.getByTestId('csv-input') as HTMLInputElement;
+    fireEvent.change(csvInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockSetFlashcardSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Imported CSV Flashcards',
+          source: 'test.csv',
+          cards: expect.arrayContaining([
+            expect.objectContaining({ question: 'Question 1', answer: 'Answer 1' }),
+            expect.objectContaining({ question: 'Question 2', answer: 'Answer 2' }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  test('handles invalid JSON file', async () => {
+    const file = new File(['invalid json'], 'test.json', { type: 'application/json' });
+
+    render(
+      <InputForm
+        setFlashcardSet={mockSetFlashcardSet}
+        setLoading={mockSetLoading}
+        setError={mockSetError}
+      />,
+    );
+
+    const jsonInput = screen.getByTestId('json-input') as HTMLInputElement;
+    fireEvent.change(jsonInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockSetError).toHaveBeenCalledWith('Failed to parse JSON file');
+    });
+  });
+
+  test('handles invalid CSV file', async () => {
+    const file = new File(['invalid,csv'], 'test.csv', { type: 'text/csv' });
+
+    render(
+      <InputForm
+        setFlashcardSet={mockSetFlashcardSet}
+        setLoading={mockSetLoading}
+        setError={mockSetError}
+      />,
+    );
+
+    const csvInput = screen.getByTestId('csv-input') as HTMLInputElement;
+    fireEvent.change(csvInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockSetError).toHaveBeenCalledWith('Failed to parse CSV file');
     });
   });
 });
