@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { extractFlashcards } from '../services/llmService';
 import { fetchWikipediaContent } from '../services/wikipediaService';
-import { FlashcardSet } from '../types';
+import { FlashcardSet, Flashcard } from '../types';
 import { getLLMConfig } from '../config';
 import { MockModeToggle } from './MockModeToggle';
+import { v4 as uuidv4 } from 'uuid';
 import '../styles/InputForm.css';
 
 interface InputFormProps {
@@ -16,6 +17,8 @@ const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setE
   const [isUrlInput, setIsUrlInput] = useState(true);
   const [input, setInput] = useState('');
   const [useMockMode, setUseMockMode] = useState(true);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedSetting = localStorage.getItem('use_mock_mode');
@@ -97,6 +100,109 @@ const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setE
     }
   };
 
+  const handleJsonImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        
+        if (!parsed.title || !parsed.cards || !Array.isArray(parsed.cards)) {
+          setError('Invalid JSON file format');
+          return;
+        }
+
+        const cards: Flashcard[] = parsed.cards.map((card: any) => ({
+          id: card.id || uuidv4(),
+          question: card.question,
+          answer: card.answer
+        }));
+
+        setFlashcardSet({
+          title: parsed.title,
+          source: parsed.source || 'Imported JSON',
+          cards,
+          createdAt: parsed.createdAt ? new Date(parsed.createdAt) : new Date()
+        });
+      } catch (error) {
+        setError('Failed to parse JSON file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          setError('CSV file is empty or invalid');
+          return;
+        }
+
+        const cards: Flashcard[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          const parts: string[] = [];
+          let current = '';
+          let inQuotes = false;
+
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            if (char === '"') {
+              if (inQuotes && line[j + 1] === '"') {
+                current += '"';
+                j++;
+              } else {
+                inQuotes = !inQuotes;
+              }
+            } else if (char === ',' && !inQuotes) {
+              parts.push(current);
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          parts.push(current);
+
+          if (parts.length >= 2) {
+            cards.push({
+              id: uuidv4(),
+              question: parts[0].replace(/^"|"$/g, '').replace(/""/g, '"'),
+              answer: parts[1].replace(/^"|"$/g, '').replace(/""/g, '"')
+            });
+          }
+        }
+
+        if (cards.length === 0) {
+          setError('No valid flashcards found in CSV');
+          return;
+        }
+
+        setFlashcardSet({
+          title: 'Imported CSV Flashcards',
+          source: file.name,
+          cards,
+          createdAt: new Date()
+        });
+      } catch (error) {
+        setError('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="input-form-container">
       <form onSubmit={handleSubmit}>
@@ -115,6 +221,39 @@ const InputForm: React.FC<InputFormProps> = ({ setFlashcardSet, setLoading, setE
           >
             Custom Text
           </button>
+        </div>
+
+        <div className="import-buttons">
+          <button
+            type="button"
+            className="import-button"
+            onClick={() => jsonInputRef.current?.click()}
+          >
+            Import JSON
+          </button>
+          <button
+            type="button"
+            className="import-button"
+            onClick={() => csvInputRef.current?.click()}
+          >
+            Import CSV
+          </button>
+          <input
+            ref={jsonInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleJsonImport}
+            style={{ display: 'none' }}
+            data-testid="json-input"
+          />
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleCsvImport}
+            style={{ display: 'none' }}
+            data-testid="csv-input"
+          />
         </div>
 
         <div className="form-group">
